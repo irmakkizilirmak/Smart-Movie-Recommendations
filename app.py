@@ -9,8 +9,9 @@ import re
 # ==========================================
 
 # Reading the files
-movies = pd.read_csv('tmdb_5000_movies.zip', compression='zip')
-credits = pd.read_csv('tmdb_5000_credits.zip', compression='zip')
+movies = pd.read_csv('https://githubusercontent.com')
+credits = pd.read_csv('https://githubusercontent.com')
+
 credits.columns = ['movie_id', 'title', 'cast', 'crew']
 df = movies.merge(credits, on='title')
 # Regex function for JSON
