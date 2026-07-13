@@ -9,8 +9,8 @@ import re
 # ==========================================
 
 # Reading the files
-movies = pd.read_csv('https://githubusercontent.com')
-credits = pd.read_csv('https://githubusercontent.com')
+movies = pd.read_csv('https://google.com/file/d/1M5z--42HMk321-ZPV3tAUeXBScXOYXS1')
+credits = pd.read_csv('https://google.com/file/d/1Z9qeqLHxtXCRaRQJKqIVh-xo7Bj63FmX')
 
 credits.columns = ['movie_id', 'title', 'cast', 'crew']
 df = movies.merge(credits, on='title')
