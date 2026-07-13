@@ -9,11 +9,10 @@ import re
 # ==========================================
 
 # Reading the files
-movies = pd.read_csv('tmdb_5000_movies.csv')
-credits = pd.read_csv('tmdb_5000_credits.csv')
+movies = pd.read_csv('tmdb_5000_movies.zip', compression='zip')
+credits = pd.read_csv('tmdb_5000_credits.zip', compression='zip')
 credits.columns = ['movie_id', 'title', 'cast', 'crew']
 df = movies.merge(credits, on='title')
-
 # Regex function for JSON
 def metin_temizle(metin):
     if pd.isna(metin):
