@@ -226,19 +226,17 @@ if search_query:
 
 
         
-        # ==========================================
+                # ==========================================
         # 3. DISPLAY RESULTS
         # ==========================================
         with st.container():
             st.success(f"'{target_movie['title']}' AI results for those who love [{selected_dimension}]:")
 
-            
             for i, (_, row) in enumerate(results.iterrows(), 1):
                 genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
                 
                 tf_val = row['tfidf_score']
                 similarity_percentage = round(tf_val * 100, 1) if pd.notna(tf_val) else 0.0
-                
                 
                 col1, col2 = st.columns([1, 2.3])
                 
@@ -247,7 +245,6 @@ if search_query:
                     st.image(poster_url, use_container_width=True)
                     
                 with col2:
-         
                     st.markdown(f"### {i}. {row['title']}")
                     imdb_score = row.get('vote_average', 0.0)
                     st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  **Genres:** {genres_list}")
@@ -263,7 +260,6 @@ if search_query:
                     st.progress(progress_value)
                     st.caption(f"Match Rate: %{similarity_percentage}")
                     
-                
                     movie_overview = row.get('overview', '').strip()
                     if movie_overview:
                         with st.expander("Read Overview"):
@@ -272,5 +268,3 @@ if search_query:
                 st.divider()
     else:
         st.warning("No movie found with that name, please try again.")
-
-                    
