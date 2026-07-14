@@ -166,7 +166,6 @@ if st.button("Discover Gourmet Matches"):
             if len(valid_indices) >= 40:
                 break
                 
-                # Temizlenen adayları dataframe olarak ayırıyoruz
         candidate_movies = df.iloc[valid_indices].copy()
         
         def calculate_dimension_score(info_soup):
@@ -183,8 +182,6 @@ if st.button("Discover Gourmet Matches"):
         
 
         results = candidate_movies.sort_values(by=['dimension_score', 'quality_score'], ascending=[False, False]).head(5)
-        
-        st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
 
 
         def calculate_dimension_score(info_soup):
@@ -198,8 +195,8 @@ if st.button("Discover Gourmet Matches"):
         
         results = candidate_movies.sort_values(by=['dimension_score', 'tfidf_score'], ascending=[False, False]).head(5)
         
-               # Çift başlık basılmasını engellemek için mevcut durumu temizleyen şık bir başarı mesajı
-        st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
+             
+        st.success(f"'{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
         
         # ==========================================
         # 3. DISPLAY RESULTS (TEMİZLENDİ VE DÜZELTİLDİ)
