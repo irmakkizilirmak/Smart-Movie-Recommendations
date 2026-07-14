@@ -56,6 +56,12 @@ def prepare_data():
     
     # Combine all metadata into a single string column (metadata soup)
     df['info_soup'] = df['clean_genres'] + " " + df['clean_keywords'] + " " + df['overview'].str.lower()
+        # IMDb puan sütununu temizle, boşsa 0.0 yap
+    if 'vote_average' in df.columns:
+        df['vote_average'] = df['vote_average'].fillna(0.0)
+    else:
+        df['vote_average'] = 0.0 # Eğer sütun adı farklıysa burayı güncelleyebilirsin
+
     return df
 
 # Initialize data preparation
@@ -97,19 +103,45 @@ if st.button("Discover Gourmet Matches"):
         idx = movie_indices[selected_movie]
         dimension_words = cinema_dimensions[selected_dimension]
         
-        # Extract AI similarity scores for the chosen movie
-        scores = list(enumerate(similarity_matrix[idx]))
+ 
+        selected_title_words = set([word.lower() for word in selected_movie.split() if len(word) > 2])
         
-        # Sort all movies based on similarity scores in descending order
+        scores = list(enumerate(similarity_matrix[idx]))
         scores = sorted(scores, key=lambda x: x[1], reverse=True)
         
-        # Extract the top 40 candidate movies (excluding the selected movie itself, starting at index 1)
-        top_40_candidates = scores[1:41]
-        top_40_indices = [i for i, score in top_40_candidates]
+      
+        top_100_candidates = scores[1:101]
         
-        # Store AI similarity scores in a dictionary mapping for final sorting purposes
-        tfidf_scores_map = {i: score for i, score in top_40_candidates}
-        candidate_movies = df.iloc[top_40_indices].copy()
+        valid_indices = []
+        tfidf_scores_map = {}
+        
+        for i, score in top_100_candidates:
+            candidate_title = df.iloc[i]['title']
+            candidate_title_words = set([word.lower() for word in candidate_title.split() if len(word) > 2])
+            
+            if selected_title_words.intersection(candidate_title_words):
+                continue
+                
+            valid_indices.append(i)
+            tfidf_scores_map[i] = score
+            
+            if len(valid_indices) >= 40:
+                break
+     
+        candidate_movies = df.iloc[valid_indices].copy()
+        
+        def calculate_dimension_score(info_soup):
+            score = 0
+            for word in dimension_words:
+                score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', info_soup))
+            return score
+            
+        candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
+        candidate_movies['tfidf_score'] = candidate_movies.index.map(tfidf_scores_map)
+        
+       
+        results = candidate_movies.sort_values(by=['dimension_score', 'tfidf_score'], ascending=[False, False]).head(5)
+
         
         # Exact-word matching function using regex to count dimension keywords safely 
         # (e.g., skips matching 'love' inside words like 'glover')
@@ -145,15 +177,21 @@ if st.button("Discover Gourmet Matches"):
                 
             with col2:
                 st.markdown(f"### {i}. {row['title']}")
-                st.caption(f"**Genres:** {genres_list}")
                 
-                # Eşleşme detaylarını gurme indikatörlerle gösteriyoruz
-                st.write(f"Match Score: `{row['dimension_score']}`")
+                # IMDb 
+                imdb_score = row.get('vote_average', 0.0)
+                st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  🎬 **Genres:** {genres_list}")
                 
-                # AI benzerlik uyumunu şık bir ilerleme çubuğu (progress bar) ile gösterelim
-                st.write(" AI Similarity Match:")
+                st.write(f"🎯 Dimension Score: `{row['dimension_score']}`")
+                
+                st.write("🤖 AI Similarity Match:")
                 st.progress(float(row['tfidf_score']) if row['tfidf_score'] <= 1.0 else 1.0)
                 st.caption(f"Match Rate: %{similarity_percentage}")
+                
+                if 'overview' in row and row['overview']:
+                    with st.expander("🎞️ Read Overview"):
+                        st.write(row['overview'])
+
                 
                 # Film özetini açılır kutu (expander) içine gizleyerek temiz tasarım sağlıyoruz
                 if 'overview' in row and row['overview']:
