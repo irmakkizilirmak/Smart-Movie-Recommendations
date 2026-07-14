@@ -70,7 +70,7 @@ def fetch_recommendation_pool(movie_id):
     return pd.DataFrame(pool)
 
 
-movie_indices = pd.Series(df.index, index=df['title'])
+
 
 cinema_dimensions = {
     "Story & Intense Emotion": ["drama", "emotion", "sad", "love", "family", "relationship", "tragedy", "crying", "feeling", "heart", "betrayal"],
