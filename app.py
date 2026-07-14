@@ -200,6 +200,8 @@ if search_query:
                         
              
                 candidate_movies = df.iloc[valid_indices].copy().reset_index(drop=True)
+                candidate_movies['info_soup'] = candidate_movies['overview'].str.lower()
+
                 
                 def calculate_dimension_score(info_soup):
                     score = 0
@@ -208,6 +210,7 @@ if search_query:
                     return score
                     
                 candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
+
                 
                
                 candidate_movies['tfidf_score'] = candidate_movies['title'].map({df.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
