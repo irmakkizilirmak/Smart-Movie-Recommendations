@@ -3,6 +3,30 @@ import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import re
+import requests
+
+# ==========================================
+# 0. API AND POSTER
+# ==========================================
+def get_poster_url(movie_id):
+    """
+    by using TMDB API 
+    """
+    try:
+       
+        api_key = st.secrets["TMDB_API_KEY"] 
+        url = f"https://themoviedb.org{movie_id}?api_key={api_key}"
+        
+        response = requests.get(url, timeout=2).json()
+        poster_path = response.get('poster_path')
+        if poster_path:
+          
+            return f"https://tmdb.org{poster_path}"
+    except Exception:
+        
+        pass
+    return "https://placeholder.com"
+
 
 # ==========================================
 # 1. DATA AND AI
@@ -83,7 +107,7 @@ if st.button("Discover Gourmet Matches"):
         top_40_candidates = scores[1:41]
         top_40_indices = [i for i, score in top_40_candidates]
         
-        # Store AI similarity scores in a dictionary mapping for final sorting sorting purposes
+        # Store AI similarity scores in a dictionary mapping for final sorting purposes
         tfidf_scores_map = {i: score for i, score in top_40_candidates}
         candidate_movies = df.iloc[top_40_indices].copy()
         
@@ -111,6 +135,29 @@ if st.button("Discover Gourmet Matches"):
             # Convert decimal similarity score to an easy-to-read percentage 
             similarity_percentage = round(row['tfidf_score'] * 100, 1)
             
-            st.markdown(f"**{i}. {row['title']}**")
-            st.caption(f"Genres: {genres_list} | Match Score: {row['dimension_score']} | AI Similarity: %{similarity_percentage}")
+            # Ekran düzenini 2 sütuna ayırıyoruz: Afiş alanı (%30) ve Detay alanı (%70)
+            col1, col2 = st.columns([1, 2.3])
+            
+            with col1:
+                # TMDB API'den film afişini çekip ekrana basıyoruz
+                poster_url = get_poster_url(row['movie_id'])
+                st.image(poster_url, use_container_width=True)
+                
+            with col2:
+                st.markdown(f"### {i}. {row['title']}")
+                st.caption(f"**Genres:** {genres_list}")
+                
+                # Eşleşme detaylarını gurme indikatörlerle gösteriyoruz
+                st.write(f"🎯 Dimension Score: `{row['dimension_score']}`")
+                
+                # AI benzerlik uyumunu şık bir ilerleme çubuğu (progress bar) ile gösterelim
+                st.write("🤖 AI Similarity Match:")
+                st.progress(float(row['tfidf_score']) if row['tfidf_score'] <= 1.0 else 1.0)
+                st.caption(f"Match Rate: %{similarity_percentage}")
+                
+                # Film özetini açılır kutu (expander) içine gizleyerek temiz tasarım sağlıyoruz
+                if 'overview' in row and row['overview']:
+                    with st.expander("🎞️ Read Overview"):
+                        st.write(row['overview'])
+                        
             st.divider()
