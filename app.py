@@ -103,12 +103,12 @@ if search_query:
 dimensions = list(cinema_dimensions.keys())
 selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
 
-        if st.button("Discover Gourmet Matches"):
-            # Canlı veri havuzumuzu internetten çekip AI modelimizi anlık eğitiyoruz
+if st.button("Discover Gourmet Matches"):
+           
             df_pool = fetch_recommendation_pool(target_movie['id'])
             
             if not df_pool.empty:
-                # Orijinal filmi modelin en başına ekliyoruz
+            
                 orig_row = pd.DataFrame([{
                     'movie_id': target_movie['id'],
                     'title': target_movie['title'],
@@ -124,8 +124,7 @@ selected_dimension = st.radio("Which aspect of this movie captivated you the mos
                 tfidf_matrix = tfidf_vectorizer.fit_transform(df['overview'].str.lower())
                 similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
                 
-                idx = 0 # Orijinal filmimiz artık her zaman havuzun en başında yani 0. indekste
-
+                idx = 0 
         dimension_words = cinema_dimensions[selected_dimension]
         
         selected_row = df.iloc[idx]
