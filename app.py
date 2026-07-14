@@ -166,7 +166,8 @@ if st.button("Discover Gourmet Matches"):
             if len(valid_indices) >= 40:
                 break
                 
-        candidate_movies = df.iloc[valid_indices].copy()
+              
+        candidate_movies = df.iloc[valid_indices].copy().reset_index(drop=True)
         
         def calculate_dimension_score(info_soup):
             score = 0
@@ -175,13 +176,20 @@ if st.button("Discover Gourmet Matches"):
             return score
             
         candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
-        candidate_movies['tfidf_score'] = candidate_movies.index.map(tfidf_scores_map)
+        candidate_movies['tfidf_score'] = candidate_movies['movie_id'].map({df.loc[i, 'movie_id']: s for i, s in tfidf_scores_map.items()})
         
-    
+        def apply_imdb_penalty(row):
+            if row['vote_average'] < 6.0:
+                return row['dimension_score'] * 0.5
+            return row['dimension_score']
+
+        candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
+        
+      
         candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
         
+        results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
 
-        results = candidate_movies.sort_values(by=['dimension_score', 'quality_score'], ascending=[False, False]).head(5)
 
 
         def calculate_dimension_score(info_soup):
