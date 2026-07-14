@@ -148,16 +148,16 @@ if st.button("Discover Gourmet Matches"):
                 st.caption(f"**Genres:** {genres_list}")
                 
                 # Eşleşme detaylarını gurme indikatörlerle gösteriyoruz
-                st.write(f"🎯 Dimension Score: `{row['dimension_score']}`")
+                st.write(f"Match Score: `{row['dimension_score']}`")
                 
                 # AI benzerlik uyumunu şık bir ilerleme çubuğu (progress bar) ile gösterelim
-                st.write("🤖 AI Similarity Match:")
+                st.write(" AI Similarity Match:")
                 st.progress(float(row['tfidf_score']) if row['tfidf_score'] <= 1.0 else 1.0)
                 st.caption(f"Match Rate: %{similarity_percentage}")
                 
                 # Film özetini açılır kutu (expander) içine gizleyerek temiz tasarım sağlıyoruz
                 if 'overview' in row and row['overview']:
-                    with st.expander("🎞️ Read Overview"):
+                    with st.expander("Read Overview"):
                         st.write(row['overview'])
                         
             st.divider()
