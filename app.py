@@ -1,236 +1,187 @@
-import pandas as pd
 import streamlit as st
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import re
 import requests
+import re
 
 # ==========================================
-# 0. API AND POSTER
+# 0. CONFIG & CONFIGURATION
 # ==========================================
-def get_poster_url(movie_id):
-    """
-    TMDB API v3 formatına uygun olarak güncel afiş linkini çeker.
-    """
-    try:
-        
-        clean_id = int(float(movie_id))
-        
-        api_key = st.secrets["TMDB_API_KEY"] 
-        url = f"https://themoviedb.org{clean_id}?api_key={api_key}"
-        
-        response = requests.get(url, timeout=2).json()
-        poster_path = response.get('poster_path')
-        if poster_path:
-            return f"https://tmdb.org{poster_path}"
-    except Exception:
-        pass
- 
-    return "https://placeholder.com🎬+Afi%C5%9F+Yüklenemedi"
+st.set_page_config(page_title="Gourmet Movie Recommender System", page_icon="🎬", layout="centered")
 
+# TMDB API 
+if "TMDB_API_KEY" in st.secrets:
+    API_KEY = st.secrets["TMDB_API_KEY"]
+else:
+    st.error("Lütfen Streamlit secrets alanına 'TMDB_API_KEY' değerini ekleyin.")
+    st.stop()
 
-
-# ==========================================
-# 1. DATA AND AI
-# ==========================================
-
-@st.cache_data  
-def prepare_data():
-    movies = pd.read_csv('movies.csv')
-    credits = pd.read_csv('credits.csv')
-    credits.columns = ['movie_id', 'title', 'cast', 'crew']
-    
-    df = movies.merge(credits, on='title').drop_duplicates(subset=['title']).reset_index(drop=True)
-    
-    def clean_text(text):
-        if pd.isna(text): 
-            return ""
-        found = re.findall(r'"name":\s*"([^"]+)"', str(text))
-        return " ".join([i.lower().replace(" ", "") for i in found])
-        
-    df['clean_genres'] = df['genres'].apply(clean_text)
-    df['clean_keywords'] = df['keywords'].apply(clean_text)
-    df['overview'] = df['overview'].fillna('')
-    
-    df['info_soup'] = df['clean_genres'] + " " + df['clean_keywords'] + " " + df['overview'].str.lower()
-    
-    if 'vote_average' in df.columns:
-        df['vote_average'] = df['vote_average'].fillna(0.0)
-    else:
-        df['vote_average'] = 0.0
-
-    return df
-
-df = prepare_data()
-
-tfidf_vectorizer = TfidfVectorizer(stop_words='english')
-tfidf_matrix = tfidf_vectorizer.fit_transform(df['info_soup'])
-similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-movie_indices = pd.Series(df.index, index=df['title'])
+BASE_URL = "https://api.themoviedb.org/3"
+IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 
 cinema_dimensions = {
-    "Story & Intense Emotion": ["drama", "emotion", "sad", "love", "family", "relationship", "tragedy", "crying", "feeling", "heart", "betrayal"],
-    "Cinematography & Atmosphere": ["cinematography", "visual", "soundtrack", "music", "color", "atmosphere", "beautiful", "effects", "aesthetic"],
-    "Direction & Craft": ["director", "editing", "camera", "sound", "production", "oscar", "award", "masterpiece", "technique"],
-    "Mind Games & Plot Twists": ["twist", "mystery", "philosophical", "mind", "puzzle", "complex", "psychological", "metaphor", "intelligent"],
-    "Fantasy Worlds & Escapism": ["sci-fi", "fantasy", "alien", "magic", "adventure", "action", "space", "future", "monster", "superhero"],
-    "Period & Real History": ["history", "culture", "society", "biography", "war", "documentary", "politics", "world", "human", "period"]
+    "Story & Intense Emotion": ["drama", "emotion", "sad", "love", "family", "relationship", "tragedy", "crying", "feeling", "heart", "betrayal", "romance", "melodrama"],
+    "Cinematography & Atmosphere": ["cinematography", "visual", "soundtrack", "music", "color", "atmosphere", "beautiful", "effects", "aesthetic", "neon", "stylized"],
+    "Direction & Craft": ["director", "editing", "camera", "sound", "production", "oscar", "award", "masterpiece", "technique", "art", "indie"],
+    "Mind Games & Plot Twists": ["twist", "mystery", "philosophical", "mind", "puzzle", "complex", "psychological", "metaphor", "intelligent", "existential", "thriller"],
+    "Fantasy Worlds & Escapism": ["sci-fi", "fantasy", "alien", "magic", "adventure", "action", "space", "future", "monster", "superhero", "cyberpunk"],
+    "Period & Real History": ["history", "culture", "society", "biography", "war", "documentary", "politics", "world", "human", "period", "historical"]
 }
+
+# ==========================================
+# 1. HELPER FUNCTIONS (TMDB LIVE CALLS)
+# ==========================================
+
+def search_movie_live(query):
+    """Kullanıcının yazdığı kelimeye göre TMDB'de canlı film arar (İlk 10 sonucu döner)"""
+    url = f"{BASE_URL}/search/movie"
+    params = {"api_key": API_KEY, "query": query, "language": "en-US", "page": 1}
+    try:
+        response = requests.get(url, params=params, timeout=3).json()
+        return response.get("results", [])
+    except Exception:
+        return []
+
+def get_movie_details_and_keywords(movie_id):
+    """Bir filmin detaylarını ve keyword'lerini çekip 'info_soup' (çorba metin) oluşturur"""
+    details_url = f"{BASE_URL}/movie/{movie_id}"
+    keywords_url = f"{BASE_URL}/movie/{movie_id}/keywords"
+    params = {"api_key": API_KEY}
+    
+    info_soup = ""
+    genres = []
+    
+    try:
+        # Details
+        det_resp = requests.get(details_url, params=params, timeout=3).json()
+        overview = det_resp.get("overview", "").lower()
+        genres = [g["name"] for g in det_resp.get("genres", [])]
+        genres_clean = " ".join([g.lower().replace(" ", "") for g in genres])
+        
+        # Keyword
+        key_resp = requests.get(keywords_url, params=params, timeout=3).json()
+        keywords = [k["name"] for k in key_resp.get("keywords", [])]
+        keywords_clean = " ".join([k.lower().replace(" ", "") for k in keywords])
+        
+        info_soup = f"{genres_clean} {keywords_clean} {overview}"
+    except Exception:
+        pass
+        
+    return info_soup, genres
+
+def get_live_recommendations(movie_id):
+    """TMDB Recommendations API kullanarak doğrudan benzer 20 filmi çeker"""
+    url = f"{BASE_URL}/movie/{movie_id}/recommendations"
+    params = {"api_key": API_KEY, "language": "en-US", "page": 1}
+    try:
+        response = requests.get(url, params=params, timeout=3).json()
+        return response.get("results", [])
+    except Exception:
+        return []
 
 # ==========================================
 # 2. STREAMLIT INTERFACE
 # ==========================================
-st.set_page_config(page_title="Gourmet Movie Recommender System", page_icon="🎬", layout="centered")
-st.title("AI-Powered Cinema Assistant")
+st.title("AI-Powered Gourmet Cinema Assistant")
 st.write("Select a movie you have watched and choose the aspect that impressed you the most. Let AI provide you with pinpoint gourmet recommendations!")
 
-movie_list = sorted(df['title'].tolist())
-selected_movie = st.selectbox("Select a movie you watched and liked:", movie_list)
+
+search_query = st.text_input("Movie Name:", placeholder="Inception, Interstellar, Dune...")
+
+selected_movie_data = None
+
+if search_query:
+    search_results = search_movie_live(search_query)
+    
+    if search_results:
+  
+        movie_options = []
+        movie_map = {}
+        
+        for m in search_results:
+            release_year = m.get("release_date", "N/A")[:4] if m.get("release_date") else "N/A"
+            label = f"{m['title']} ({release_year})"
+            movie_options.append(label)
+            movie_map[label] = m
+            
+        selected_label = st.selectbox("Choose the right mpvie:", movie_options)
+        selected_movie_data = movie_map[selected_label]
+    else:
+        st.warning("Warning no connection")
+
 dimensions = list(cinema_dimensions.keys())
-selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
+selected_dimension = st.radio("What was the most impressing thing about the movie?", dimensions)
 
-if st.button("Discover Gourmet Matches"):
-    if selected_movie in movie_indices:
-        idx = movie_indices[selected_movie]
-        dimension_words = cinema_dimensions[selected_dimension]
-        
-        selected_row = df.iloc[idx]
-        selected_title_lower = selected_movie.lower()
-        selected_overview_clean = selected_row['overview'].strip().lower()
-        
-        selected_title_words = set([w for w in selected_title_lower.split() if len(w) > 2])
-        
-        selected_cast = str(selected_row.get('cast', '')).lower()
-        selected_crew = str(selected_row.get('crew', '')).lower()
-        
-        selected_cast_words = set(re.findall(r'"name":\s*"([^"]+)"', selected_cast)[:3])
-        selected_cast_words = {w.lower() for name in selected_cast_words for w in name.split()}
-        
-        selected_director = ""
-        director_match = re.search(r'"job":\s*"Director",\s*"name":\s*"([^"]+)"', selected_crew)
-        if director_match:
-            selected_director = director_match.group(1).lower()
 
-       
-        scores = list(enumerate(similarity_matrix[idx]))
-        
-        scores = sorted(scores, key=lambda x: x[1], reverse=True)
-        top_150_candidates = scores[1:151]
-        
-        valid_indices = []
-        tfidf_scores_map = {}
-        seen_overviews = set()
-        
-        if selected_overview_clean:
-            seen_overviews.add(selected_overview_clean)
-            
-        for i, score in top_150_candidates:
-            candidate_row = df.iloc[i]
-            candidate_title = candidate_row['title'].lower()
-            candidate_overview = candidate_row['overview'].strip().lower()
-            
-          
-            if candidate_overview in seen_overviews or any(candidate_overview[:30] == seen[:30] for seen in seen_overviews):
-                continue
-                
-        
-            candidate_title_words = set([w for w in candidate_title.split() if len(w) > 2])
-            is_same_name = bool(selected_title_words.intersection(candidate_title_words))
-            
-            candidate_cast = str(candidate_row.get('cast', '')).lower()
-            candidate_crew = str(candidate_row.get('crew', '')).lower()
-            
-            candidate_director = ""
-            c_dir_match = re.search(r'"job":\s*"Director",\s*"name":\s*"([^"]+)"', candidate_crew)
-            if c_dir_match:
-                candidate_director = c_dir_match.group(1).lower()
-                
-            candidate_cast_names = set(re.findall(r'"name":\s*"([^"]+)"', candidate_cast)[:3])
-            candidate_cast_words = {w.lower() for name in candidate_cast_names for w in name.split()}
-            
-            is_same_director = (selected_director == candidate_director) if selected_director else False
-            is_same_actors = bool(selected_cast_words.intersection(candidate_cast_words)) if selected_cast_words else False
-            
-            if is_same_name or (is_same_director and is_same_actors):
-                continue
-                
-            valid_indices.append(i)
-            tfidf_scores_map[i] = score
-            if candidate_overview:
-                seen_overviews.add(candidate_overview)
-                
-            if len(valid_indices) >= 40:
-                break
-                
-     
-        candidate_movies = df.iloc[valid_indices].copy().reset_index(drop=True)
-        
-        def calculate_dimension_score(info_soup):
-            score = 0
-            for word in dimension_words:
-                score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', info_soup))
-            return score
-            
-        candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
-        
-       
-        candidate_movies['tfidf_score'] = candidate_movies['title'].map({df.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
+if st.button("Discover Gourmet Matches") and selected_movie_data:
+    target_id = selected_movie_data["id"]
+    target_title = selected_movie_data["title"]
+    dimension_words = cinema_dimensions[selected_dimension]
+    
+    with st.spinner("Loading..."):
       
-        def apply_imdb_penalty(row):
-            if row['vote_average'] < 6.0:
-                return float(row['dimension_score']) * 0.5
-            return float(row['dimension_score'])
-
-        candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
+        raw_recs = get_live_recommendations(target_id)
         
-        # Calculate the Score
-        candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
-
-        results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
-
-        
-        # ==========================================
-        # 3. DISPLAY RESULTS
-        # ==========================================
-        with st.container():
-            st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
+        if not raw_recs:
+            st.warning("No recommendations for this movie.")
+        else:
+            scored_candidates = []
             
-            for i, (_, row) in enumerate(results.iterrows(), 1):
-                genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
+            for rec in raw_recs[:20]: 
+                rec_id = rec["id"]
+                rec_title = rec["title"]
+                vote_avg = rec.get("vote_average", 0.0)
+   
+                soup, genres = get_movie_details_and_keywords(rec_id)
                 
-                tf_val = row['tfidf_score']
-                similarity_percentage = round(tf_val * 100, 1) if pd.notna(tf_val) else 0.0
+           
+                dim_score = 0
+                for word in dimension_words:
+                    dim_score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', soup))
+                    
+            
+                final_dim_score = dim_score * 0.5 if vote_avg < 6.0 else float(dim_score)
                 
+            
+                quality_score = (vote_avg / 10.0) * 0.6 + (rec.get("popularity", 0.0) / 500.0) * 0.4
                 
+                scored_candidates.append({
+                    "title": rec_title,
+                    "overview": rec.get("overview", "No overview available."),
+                    "poster_path": rec.get("poster_path"),
+                    "vote_average": vote_avg,
+                    "genres": genres,
+                    "dim_score": dim_score,
+                    "final_dim_score": final_dim_score,
+                    "quality_score": quality_score
+                })
+            
+        
+            results = sorted(scored_candidates, key=lambda x: (x["final_dim_score"], x["quality_score"]), reverse=True)[:5]
+            
+            st.success(f"🍿 [{selected_dimension}] odaklı '{target_title}' benzeri gurme seçimlerimiz:")
+            st.divider()
+            
+            for i, movie in enumerate(results, 1):
                 col1, col2 = st.columns([1, 2.3])
                 
                 with col1:
-                    poster_url = get_poster_url(row['movie_id'])
+                    if movie["poster_path"]:
+                        poster_url = f"{IMAGE_BASE_URL}{movie['poster_path']}"
+                    else:
+                        poster_url = "https://via.placeholder.com/500x750?text=No+Poster"
                     st.image(poster_url, use_container_width=True)
                     
                 with col2:
-         
-                    st.markdown(f"### {i}. {row['title']}")
-                    imdb_score = row.get('vote_average', 0.0)
-                    st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  **Genres:** {genres_list}")
+                    st.markdown(f"### {i}. {movie['title']}")
+                    genres_list = ", ".join(movie["genres"]) if movie["genres"] else "Not Specified"
+                    st.markdown(f"⭐ **IMDb:** `{movie['vote_average']:.1f}/10`  |  **Genres:** {genres_list}")
                     
-                    if row['vote_average'] < 6.0:
-                        st.write(f" Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
+                    if movie['vote_average'] < 6.0:
+                        st.write(f"**Dimension Match Score:** `{int(movie['dim_score'])}` (Cezalı: `{movie['final_dim_score']}`)")
                     else:
-                        st.write(f" Match Score: `{int(row['dimension_score'])}`")
-                        
-                    st.write(" AI Similarity Match:")
+                        st.write(f"**Dimension Match Score:** `{int(movie['dim_score'])}`")
                     
-                    progress_value = float(tf_val) if pd.notna(tf_val) and tf_val <= 1.0 else 0.0
-                    st.progress(progress_value)
-                    st.caption(f"Match Rate: %{similarity_percentage}")
-                    
-                
-                    movie_overview = row.get('overview', '').strip()
-                    if movie_overview:
+                    if movie["overview"]:
                         with st.expander("Read Overview"):
-                            st.write(movie_overview)
-    
+                            st.write(movie["overview"])
+                
                 st.divider()
-                    
