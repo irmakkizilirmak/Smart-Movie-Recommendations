@@ -47,28 +47,28 @@ movie_indices = pd.Series(df.index, index=df['title'])
 
 # Defined 6 dimensions of cinema with their respective target keywords
 cinema_dimensions = {
-    "Dramatik Yapı ve Duygu": ["drama", "emotion", "sad", "love", "family", "relationship", "tragedy", "crying", "feeling", "heart", "betrayal"],
-    "Görsel ve İşitsel Estetik": ["cinematography", "visual", "soundtrack", "music", "color", "atmosphere", "beautiful", "effects", "aesthetic"],
-    "Teknik Başarı ve Zanaat": ["director", "editing", "camera", "sound", "production", "oscar", "award", "masterpiece", "technique"],
-    "Zihinsel Egzersiz ve Senaryo": ["twist", "mystery", "philosophical", "mind", "puzzle", "complex", "psychological", "metaphor", "intelligent"],
-    "Escapizm (Gerçeklikten Kaçış)": ["sci-fi", "fantasy", "alien", "magic", "adventure", "action", "space", "future", "monster", "superhero"],
-    "Sosyokültürel Keşif": ["history", "culture", "society", "biography", "war", "documentary", "politics", "world", "human", "period"]
+    "Story & Intense Emotion": ["drama", "emotion", "sad", "love", "family", "relationship", "tragedy", "crying", "feeling", "heart", "betrayal"],
+    "Cinematography & Atmosphere": ["cinematography", "visual", "soundtrack", "music", "color", "atmosphere", "beautiful", "effects", "aesthetic"],
+    "Direction & Craft": ["director", "editing", "camera", "sound", "production", "oscar", "award", "masterpiece", "technique"],
+    "Mind Games & Plot Twists": ["twist", "mystery", "philosophical", "mind", "puzzle", "complex", "psychological", "metaphor", "intelligent"],
+    "Fantasy Worlds & Escapism": ["sci-fi", "fantasy", "alien", "magic", "adventure", "action", "space", "future", "monster", "superhero"],
+    "Period & Real History": ["history", "culture", "society", "biography", "war", "documentary", "politics", "world", "human", "period"]
 }
 
 # ==========================================
 # 2. STREAMLIT INTERFACE
 # ==========================================
-st.set_page_config(page_title="Gurme Sinema Öneri Sistemi", page_icon="🎬", layout="centered")
-st.title("🎬 Yapay Zeka Tabanlı Gurme Sinema Asistanı")
-st.write("İzlediğiniz bir filmi seçin ve o filmde sizi en çok etkileyen boyutu işaretleyin. Yapay zeka size nokta atışı gurme öneriler sunsun!")
+st.set_page_config(page_title="Gourmet Movie Recommender System", page_icon="🎬", layout="centered")
+st.title("AI-Powered Cinema Assistant")
+st.write("Select a movie you have watched and choose the aspect that impressed you the most. Let AI provide you with pinpoint gourmet recommendations!")
 
 # Setup UI input selectors
 movie_list = sorted(df['title'].tolist())
-selected_movie = st.selectbox("İzlediğiniz ve beğendiğiniz film:", movie_list)
+selected_movie = st.selectbox("Select a movie you watched and liked:", movie_list)
 dimensions = list(cinema_dimensions.keys())
-selected_dimension = st.radio("Bu filmde en çok hangi yön ilginizi çekti?", dimensions)
+selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
 
-if st.button("Gurme Önerileri Getir 🎯"):
+if st.button("Discover Gourmet Matches"):
     if selected_movie in movie_indices:
         idx = movie_indices[selected_movie]
         dimension_words = cinema_dimensions[selected_dimension]
@@ -101,7 +101,7 @@ if st.button("Gurme Önerileri Getir 🎯"):
         # Primary sort by chosen user dimension score, secondary sort by underlying AI similarity score
         results = candidate_movies.sort_values(by=['dimension_score', 'tfidf_score'], ascending=[False, False]).head(5)
         
-        st.success(f"🍿 '{selected_movie}' filmini sevenler ve odağı [{selected_dimension}] olanlar için yapay zeka sonuçları:")
+        st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
         
         # Display the final recommended results on screen
         for i, (_, row) in enumerate(results.iterrows(), 1):
@@ -112,5 +112,5 @@ if st.button("Gurme Önerileri Getir 🎯"):
             similarity_percentage = round(row['tfidf_score'] * 100, 1)
             
             st.markdown(f"**{i}. {row['title']}**")
-            st.caption(f"🎥 Türler: {genres_list} | 🎯 Odak Skoru: {row['dimension_score']} | 🤖 Yapay Zeka Benzerliği: %{similarity_percentage}")
+            st.caption(f"Genres: {genres_list} | Match Score: {row['dimension_score']} | AI Similarity: %{similarity_percentage}")
             st.divider()
