@@ -6,17 +6,16 @@ import re
 import requests
 
 # ==========================================
-# 0. API AND POSTER
+# 0. API
 # ==========================================
 def get_poster_url(movie_id):
     """
     TMDB API v3 formatına uygun olarak güncel afiş linkini çeker.
     """
     try:
-        
         clean_id = int(float(movie_id))
-        
         api_key = st.secrets["TMDB_API_KEY"] 
+        
         url = f"https://themoviedb.org{clean_id}?api_key={api_key}"
         
         response = requests.get(url, timeout=2).json()
@@ -27,7 +26,6 @@ def get_poster_url(movie_id):
         pass
  
     return "https://placeholder.com🎬+Afi%C5%9F+Yüklenemedi"
-
 
 
 # ==========================================
@@ -112,9 +110,7 @@ if st.button("Discover Gourmet Matches"):
         if director_match:
             selected_director = director_match.group(1).lower()
 
-       
         scores = list(enumerate(similarity_matrix[idx]))
-        
         scores = sorted(scores, key=lambda x: x[1], reverse=True)
         top_150_candidates = scores[1:151]
         
@@ -130,11 +126,9 @@ if st.button("Discover Gourmet Matches"):
             candidate_title = candidate_row['title'].lower()
             candidate_overview = candidate_row['overview'].strip().lower()
             
-          
             if candidate_overview in seen_overviews or any(candidate_overview[:30] == seen[:30] for seen in seen_overviews):
                 continue
                 
-        
             candidate_title_words = set([w for w in candidate_title.split() if len(w) > 2])
             is_same_name = bool(selected_title_words.intersection(candidate_title_words))
             
@@ -163,7 +157,6 @@ if st.button("Discover Gourmet Matches"):
             if len(valid_indices) >= 40:
                 break
                 
-     
         candidate_movies = df.iloc[valid_indices].copy().reset_index(drop=True)
         
         def calculate_dimension_score(info_soup):
@@ -173,8 +166,6 @@ if st.button("Discover Gourmet Matches"):
             return score
             
         candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
-        
-       
         candidate_movies['tfidf_score'] = candidate_movies['title'].map({df.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
       
         def apply_imdb_penalty(row):
@@ -183,25 +174,21 @@ if st.button("Discover Gourmet Matches"):
             return float(row['dimension_score'])
 
         candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
-        
-        # Calculate the Score
         candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
 
-        results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
+        results = candidate_movies.sort_values(by=['tfidf_score', 'quality_score'], ascending=[False, False]).head(5)
 
-        
         # ==========================================
-        # 3. DISPLAY RESULTS
+        # 3. DISPLAY RESULTS 
         # ==========================================
         with st.container():
-            st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
+            st.success(f"'{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
             
             for i, (_, row) in enumerate(results.iterrows(), 1):
                 genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
                 
                 tf_val = row['tfidf_score']
                 similarity_percentage = round(tf_val * 100, 1) if pd.notna(tf_val) else 0.0
-                
                 
                 col1, col2 = st.columns([1, 2.3])
                 
@@ -210,29 +197,15 @@ if st.button("Discover Gourmet Matches"):
                     st.image(poster_url, use_container_width=True)
                     
                 with col2:
-         
                     st.markdown(f"### {i}. {row['title']}")
                     imdb_score = row.get('vote_average', 0.0)
                     st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  **Genres:** {genres_list}")
                     
                     if row['vote_average'] < 6.0:
-                        st.write(f" Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
+                        st.write(f"Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
                     else:
-                        st.write(f" Match Score: `{int(row['dimension_score'])}`")
+                        st.write(f"Match Score: `{int(row['dimension_score'])}`")
                         
-                    st.write(" AI Similarity Match:")
-                    
-                    progress_value = float(tf_val) if pd.notna(tf_val) and tf_val <= 1.0 else 0.0
-                    st.progress(progress_value)
-                    st.caption(f"Match Rate: %{similarity_percentage}")
-                    
-                
-                    movie_overview = row.get('overview', '').strip()
-                    if movie_overview:
-                        with st.expander("Read Overview"):
-                            st.write(movie_overview)
-    
-                st.divider()
 
 
 
