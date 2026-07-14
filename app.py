@@ -185,17 +185,17 @@ if st.button("Discover Gourmet Matches"):
         results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
         
         # ==========================================
-        # 3. DISPLAY RESULTS (KUSURSUZ TASARIM)
+        # 3. DISPLAY RESULTS
         # ==========================================
         with st.container():
-            st.success(f" '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
+            st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
             
             for i, (_, row) in enumerate(results.iterrows(), 1):
                 genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
                 
-                # NaN kontrolü eklenmiş yüzde gösterimi
                 tf_val = row['tfidf_score']
                 similarity_percentage = round(tf_val * 100, 1) if pd.notna(tf_val) else 0.0
+                
                 
                 col1, col2 = st.columns([1, 2.3])
                 
@@ -204,10 +204,30 @@ if st.button("Discover Gourmet Matches"):
                     st.image(poster_url, use_container_width=True)
                     
                 with col2:
+         
                     st.markdown(f"### {i}. {row['title']}")
                     imdb_score = row.get('vote_average', 0.0)
-                    st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  | **Genres:** {genres_list}")
+                    st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  **Genres:** {genres_list}")
                     
+                    if row['vote_average'] < 6.0:
+                        st.write(f" Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
+                    else:
+                        st.write(f" Match Score: `{int(row['dimension_score'])}`")
+                        
+                    st.write(" AI Similarity Match:")
+                    
+                    progress_value = float(tf_val) if pd.notna(tf_val) and tf_val <= 1.0 else 0.0
+                    st.progress(progress_value)
+                    st.caption(f"Match Rate: %{similarity_percentage}")
+                    
+                
+                    movie_overview = row.get('overview', '').strip()
+                    if movie_overview:
+                        with st.expander("🎞️ Read Overview"):
+                            st.write(movie_overview)
+    
+                st.divider()
+
 
 
 
