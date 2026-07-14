@@ -82,14 +82,13 @@ cinema_dimensions = {
 }
 
 # ==========================================
-# 2. STREAMLIT INTERFACE
+# 2. STREAMLIT INTERFACE 
 # ==========================================
-st.set_page_config(page_title="Gourmet Movie Recommender System", page_icon="🎬", layout="centered")
-st.title("AI-Powered Cinema Assistant")
-st.write("Select a movie you have watched and choose the aspect that impressed you the most. Let AI provide you with pinpoint gourmet recommendations!")
+st.title("AI-Powered Cinema Assistant (Live Edition)")
+st.write("Milyonlarca film arasından arama yapın ve gurme yapay zeka modelimizle nokta atışı tavsiyeler alın!")
 
 
-search_query = st.text_input("Bir film adı yazın (Örn: The Love Witch, Saw):", "")
+search_query = st.text_input("Bir film adı yazın (Örn: The Love Witch, Saw, Batman Begins):", "")
 
 if search_query:
     api_key = st.secrets["TMDB_API_KEY"]
@@ -101,22 +100,25 @@ if search_query:
         search_results = []
     
     if search_results:
+       
         movie_options = {f"{m['title']} ({m.get('release_date', '')[:4]})": m for m in search_results}
         selected_display = st.selectbox("Eşleşen filmler arasından tam olarak hangisi?", list(movie_options.keys()))
+        
         target_movie = movie_options[selected_display]
-
-dimensions = list(cinema_dimensions.keys())
-selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
-
-
+        
+       
+        dimensions = list(cinema_dimensions.keys())
+        selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
+        
+      
         if st.button("Discover Gourmet Matches"):
             with st.spinner("Gurme Yapay Zeka modeli dinamik veri setini eğitiyor..."):
                 
-                
+          
                 df_pool = fetch_recommendation_pool(target_movie['id'])
                 
                 if not df_pool.empty:
-                  
+                   
                     orig_row = pd.DataFrame([{
                         'movie_id': target_movie['id'],
                         'title': target_movie['title'],
@@ -126,12 +128,13 @@ selected_dimension = st.radio("Which aspect of this movie captivated you the mos
                         'clean_genres': ""
                     }])
                     df_pool = pd.concat([orig_row, df_pool]).drop_duplicates(subset=['movie_id']).reset_index(drop=True)
+                  
                     tfidf_vectorizer = TfidfVectorizer(stop_words='english')
                     tfidf_matrix = tfidf_vectorizer.fit_transform(df_pool['overview'].str.lower())
                     similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-              
-                    scores = list(enumerate(similarity_matrix[0]))
-                    scores = sorted(scores, key=lambda x: x[1], reverse=True)
+                    
+                    scores = list(enumerate(similarity_matrix))
+                    scores = sorted(scores, key=lambda x: x, reverse=True)
                     top_candidates = scores[1:]
                     
                     valid_indices = []
@@ -142,7 +145,8 @@ selected_dimension = st.radio("Which aspect of this movie captivated you the mos
                         
                     candidate_movies = df_pool.iloc[valid_indices].copy().reset_index(drop=True)
                     
-              
+                    
+                    dimension_words = cinema_dimensions[selected_dimension]
                     def calculate_dimension_score(overview):
                         score = 0
                         for word in dimension_words:
@@ -152,20 +156,19 @@ selected_dimension = st.radio("Which aspect of this movie captivated you the mos
                     candidate_movies['dimension_score'] = candidate_movies['overview'].apply(calculate_dimension_score)
                     candidate_movies['tfidf_score'] = candidate_movies['title'].map({df_pool.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
                     
-                  
+                   
                     def apply_imdb_penalty(row):
                         if row['vote_average'] < 6.0:
                             return float(row['dimension_score']) * 0.5
                         return float(row['dimension_score'])
                     candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
                     
-                 
+                  
                     candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
                     results = candidate_movies.sort_values(by=['tfidf_score', 'quality_score'], ascending=[False, False]).head(5)
-                    
-                
+                  
                     with st.container():
-                        st.success(f"'{target_movie['title']}' AI results for those who love [{selected_dimension}]:")
+                        st.success(f"🍿 '{target_movie['title']}' AI results for those who love [{selected_dimension}]:")
                         
                         for i, (_, row) in enumerate(results.iterrows(), 1):
                             tf_val = row['tfidf_score']
@@ -184,9 +187,9 @@ selected_dimension = st.radio("Which aspect of this movie captivated you the mos
                                 st.markdown(f"⭐ **IMDb:** `{round(row['vote_average'], 1)}/10`")
                                 
                                 if row['vote_average'] < 6.0:
-                                    st.write(f"Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
+                                    st.write(f" Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
                                 else:
-                                    st.write(f" Match Score: `{int(row['dimension_score'])}`")
+                                    st.write(f"Match Score: `{int(row['dimension_score'])}`")
                                     
                                 st.write("AI Similarity Match:")
                                 progress_value = float(tf_val) if pd.notna(tf_val) and tf_val <= 1.0 else 0.0
@@ -197,76 +200,5 @@ selected_dimension = st.radio("Which aspect of this movie captivated you the mos
                                     with st.expander("Base Overview"):
                                         st.write(row['overview'])
                             st.divider()
-
-        
-        def calculate_dimension_score(info_soup):
-            score = 0
-            for word in dimension_words:
-                score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', info_soup))
-            return score
-            
-        candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
-        
-       
-        candidate_movies['tfidf_score'] = candidate_movies['title'].map({df.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
-      
-        def apply_imdb_penalty(row):
-            if row['vote_average'] < 6.0:
-                return float(row['dimension_score']) * 0.5
-            return float(row['dimension_score'])
-
-        candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
-        
-        # Calculate the Score
-        candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
-
-        results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
-
-        
-        # ==========================================
-        # 3. DISPLAY RESULTS
-        # ==========================================
-        with st.container():
-            st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
-            
-            for i, (_, row) in enumerate(results.iterrows(), 1):
-                genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
-                
-                tf_val = row['tfidf_score']
-                similarity_percentage = round(tf_val * 100, 1) if pd.notna(tf_val) else 0.0
-                
-                
-                col1, col2 = st.columns([1, 2.3])
-                
-                with col1:
-                    poster_url = get_poster_url(row['movie_id'])
-                    st.image(poster_url, use_container_width=True)
-                    
-                with col2:
-         
-                    st.markdown(f"### {i}. {row['title']}")
-                    imdb_score = row.get('vote_average', 0.0)
-                    st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  **Genres:** {genres_list}")
-                    
-                    if row['vote_average'] < 6.0:
-                        st.write(f" Match Score: `{int(row['dimension_score'])}` (Cezalı: `{row['final_dimension_score']}`)")
-                    else:
-                        st.write(f" Match Score: `{int(row['dimension_score'])}`")
-                        
-                    st.write(" AI Similarity Match:")
-                    
-                    progress_value = float(tf_val) if pd.notna(tf_val) and tf_val <= 1.0 else 0.0
-                    st.progress(progress_value)
-                    st.caption(f"Match Rate: %{similarity_percentage}")
-                    
-                
-                    movie_overview = row.get('overview', '').strip()
-                    if movie_overview:
-                        with st.expander("Read Overview"):
-                            st.write(movie_overview)
-    
-                st.divider()
-                    
-
-
-
+    else:
+        st.warning("Aradığınız isimde bir film bulunamadı, lütfen tekrar deneyin.")
