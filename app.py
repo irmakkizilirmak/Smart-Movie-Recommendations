@@ -198,10 +198,11 @@ if st.button("Discover Gourmet Matches"):
         
         results = candidate_movies.sort_values(by=['dimension_score', 'tfidf_score'], ascending=[False, False]).head(5)
         
+               # Çift başlık basılmasını engellemek için mevcut durumu temizleyen şık bir başarı mesajı
         st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
         
         # ==========================================
-        # 3. DISPLAY RESULTS 
+        # 3. DISPLAY RESULTS (TEMİZLENDİ VE DÜZELTİLDİ)
         # ==========================================
         for i, (_, row) in enumerate(results.iterrows(), 1):
             genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
@@ -210,23 +211,27 @@ if st.button("Discover Gourmet Matches"):
             col1, col2 = st.columns([1, 2.3])
             
             with col1:
+                
                 poster_url = get_poster_url(row['movie_id'])
                 st.image(poster_url, use_container_width=True)
                 
             with col2:
+              
                 st.markdown(f"### {i}. {row['title']}")
                 imdb_score = row.get('vote_average', 0.0)
                 st.markdown(f"⭐ **IMDb:** `{imdb_score}/10`  |  🎬 **Genres:** {genres_list}")
                 
-                st.write(f"🎯 Dimension Score: `{row['dimension_score']}`")
-                st.write("🤖 AI Similarity Match:")
+                st.write(f" Dimension Score: `{row['dimension_score']}`")
+                st.write("AI Similarity Match:")
                 st.progress(float(row['tfidf_score']) if row['tfidf_score'] <= 1.0 else 1.0)
                 st.caption(f"Match Rate: %{similarity_percentage}")
                 
               
                 if 'overview' in row and row['overview']:
-                    with st.expander("🎞️ Read Overview"):
+                    with st.expander("Read Overview"):
                         st.write(row['overview'])
                         
+           
             st.divider()
+
 
