@@ -214,9 +214,7 @@ if st.button("Discover Gourmet Matches") and selected_movie_data:
                     genres_list = ", ".join(movie["genres"]) if movie["genres"] else "Not Specified"
                     
                    
-                    badge = ""
-                    if movie["popularity"] < 50 and movie["vote_average"] >= 7.0:
-                        badge = " 🌟 *[Hidden Gem]*"
+                    
                     
                     st.markdown(f"⭐ **IMDb:** `{movie['vote_average']:.1f}/10`  |  **Genres:** {genres_list}{badge}")
                     st.write(f"**Dimension Relevance:** `{int(movie['dim_score'])}` matches")
