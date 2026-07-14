@@ -216,7 +216,7 @@ if st.button("Discover Gourmet Matches") and selected_movie_data:
                    
                     
                     
-                    st.markdown(f"⭐ **IMDb:** `{movie['vote_average']:.1f}/10`  |  **Genres:** {genres_list}{badge}")
+                    st.markdown(f"⭐ **IMDb:** `{movie['vote_average']:.1f}/10`  |  **Genres:** {genres_list}")
                     st.write(f"**Dimension Relevance:** `{int(movie['dim_score'])}` matches")
                     
                     if movie["overview"]:
