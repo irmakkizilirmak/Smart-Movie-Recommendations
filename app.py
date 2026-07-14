@@ -13,7 +13,7 @@ def get_poster_url(movie_id):
     TMDB API v3 formatına uygun olarak güncel afiş linkini çeker.
     """
     try:
-        # ID'yi kesin olarak tam sayıya çeviriyoruz (Ondalıklı sayı uyuşmazlığını çözer)
+        
         clean_id = int(float(movie_id))
         
         api_key = st.secrets["TMDB_API_KEY"] 
@@ -25,7 +25,7 @@ def get_poster_url(movie_id):
             return f"https://tmdb.org{poster_path}"
     except Exception:
         pass
-    # Afiş yüklenemezse gri boş kutu yerine şık bir film rulosu ikonu gösterelim
+ 
     return "https://placeholder.com🎬+Afi%C5%9F+Yüklenemedi"
 
 
@@ -188,6 +188,7 @@ if st.button("Discover Gourmet Matches"):
         candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
 
         results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
+
         
         # ==========================================
         # 3. DISPLAY RESULTS
