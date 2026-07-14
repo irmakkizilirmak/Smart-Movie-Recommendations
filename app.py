@@ -166,7 +166,26 @@ if st.button("Discover Gourmet Matches"):
             if len(valid_indices) >= 40:
                 break
                 
+                # Temizlenen adayları dataframe olarak ayırıyoruz
         candidate_movies = df.iloc[valid_indices].copy()
+        
+        def calculate_dimension_score(info_soup):
+            score = 0
+            for word in dimension_words:
+                score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', info_soup))
+            return score
+            
+        candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
+        candidate_movies['tfidf_score'] = candidate_movies.index.map(tfidf_scores_map)
+        
+    
+        candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
+        
+
+        results = candidate_movies.sort_values(by=['dimension_score', 'quality_score'], ascending=[False, False]).head(5)
+        
+        st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
+
 
         def calculate_dimension_score(info_soup):
             score = 0
