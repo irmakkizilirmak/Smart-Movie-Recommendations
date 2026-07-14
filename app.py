@@ -111,37 +111,72 @@ dimensions = list(cinema_dimensions.keys())
 selected_dimension = st.radio("What was the most impressing thing about the movie?", dimensions)
 
 
+
+# ==========================================
+
 if st.button("Discover Gourmet Matches") and selected_movie_data:
     target_id = selected_movie_data["id"]
     target_title = selected_movie_data["title"]
     dimension_words = cinema_dimensions[selected_dimension]
     
-    with st.spinner("Loading..."):
+    with st.spinner("Finding hidden gourmet gems..."):
       
-        raw_recs = get_live_recommendations(target_id)
+        recs_url = f"{BASE_URL}/movie/{target_id}/recommendations"
+        similar_url = f"{BASE_URL}/movie/{target_id}/similar"
+        params = {"api_key": API_KEY, "language": "en-US", "page": 1}
         
-        if not raw_recs:
-            st.warning("No recommendations for this movie.")
+        raw_candidates = []
+        try:
+            recs_resp = requests.get(recs_url, params=params, timeout=3).json().get("results", [])
+            sim_resp = requests.get(similar_url, params=params, timeout=3).json().get("results", [])
+            
+            combined = {m["id"]: m for m in recs_resp + sim_resp}.values()
+            raw_candidates = list(combined)[:35]
+        except Exception:
+            raw_candidates = []
+            
+        if not raw_candidates:
+            st.warning("No recommendations found on TMDB for this movie. Try searching for another one.")
         else:
             scored_candidates = []
             
-            for rec in raw_recs[:20]: 
+            for rec in raw_candidates:
                 rec_id = rec["id"]
                 rec_title = rec["title"]
+                
+               
+                if rec_id == target_id:
+                    continue
+                    
                 vote_avg = rec.get("vote_average", 0.0)
-   
+                popularity = rec.get("popularity", 0.0)
+                
+                
                 soup, genres = get_movie_details_and_keywords(rec_id)
                 
-           
+              
                 dim_score = 0
                 for word in dimension_words:
                     dim_score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', soup))
-                    
-            
-                final_dim_score = dim_score * 0.5 if vote_avg < 6.0 else float(dim_score)
                 
-            
-                quality_score = (vote_avg / 10.0) * 0.6 + (rec.get("popularity", 0.0) / 500.0) * 0.4
+               
+                if dim_score == 0:
+                    final_dim_score = -50.0
+                else:
+                    final_dim_score = float(dim_score)
+                  
+                    if vote_avg < 6.0:
+                        final_dim_score *= 0.3
+                
+              
+                popularity_penalty = 0.0
+                if popularity > 180: 
+                    popularity_penalty = -1.5
+                elif popularity < 50 and vote_avg >= 7.0:
+                    popularity_penalty = 1.5 
+                
+              
+                gourmet_rank_score = final_dim_score + (vote_avg * 0.5) + popularity_penalty
                 
                 scored_candidates.append({
                     "title": rec_title,
@@ -150,17 +185,21 @@ if st.button("Discover Gourmet Matches") and selected_movie_data:
                     "vote_average": vote_avg,
                     "genres": genres,
                     "dim_score": dim_score,
-                    "final_dim_score": final_dim_score,
-                    "quality_score": quality_score
+                    "gourmet_rank_score": gourmet_rank_score,
+                    "popularity": popularity
                 })
             
-        
-            results = sorted(scored_candidates, key=lambda x: (x["final_dim_score"], x["quality_score"]), reverse=True)[:5]
+           
+            results = sorted(scored_candidates, key=lambda x: x["gourmet_rank_score"], reverse=True)[:5]
             
-            st.success(f"Our gourmet selections similar to '{target_title}' for those who appreciate [{selected_dimension}]:")
+            st.success(f"🍿 Our gourmet matches for '{target_title}' focusing on [{selected_dimension}]:")
             st.divider()
             
             for i, movie in enumerate(results, 1):
+             
+                if movie["gourmet_rank_score"] < -5:
+                    continue
+                    
                 col1, col2 = st.columns([1, 2.3])
                 
                 with col1:
@@ -173,12 +212,14 @@ if st.button("Discover Gourmet Matches") and selected_movie_data:
                 with col2:
                     st.markdown(f"### {i}. {movie['title']}")
                     genres_list = ", ".join(movie["genres"]) if movie["genres"] else "Not Specified"
-                    st.markdown(f"⭐ **IMDb:** `{movie['vote_average']:.1f}/10`  |  **Genres:** {genres_list}")
                     
-                    if movie['vote_average'] < 6.0:
-                        st.write(f"**Dimension Match Score:** `{int(movie['dim_score'])}` (Cezalı: `{movie['final_dim_score']}`)")
-                    else:
-                        st.write(f"**Dimension Match Score:** `{int(movie['dim_score'])}`")
+                   
+                    badge = ""
+                    if movie["popularity"] < 50 and movie["vote_average"] >= 7.0:
+                        badge = " 🌟 *[Hidden Gem]*"
+                    
+                    st.markdown(f"⭐ **IMDb:** `{movie['vote_average']:.1f}/10`  |  **Genres:** {genres_list}{badge}")
+                    st.write(f"**Dimension Relevance:** `{int(movie['dim_score'])}` matches")
                     
                     if movie["overview"]:
                         with st.expander("Read Overview"):
