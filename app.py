@@ -100,11 +100,12 @@ if search_query:
         selected_display = st.selectbox("Which movie do you mean exactly?", list(movie_options.keys()))
         target_movie = movie_options[selected_display]
 
-dimensions = list(cinema_dimensions.keys())
-selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
+        
+        dimensions = list(cinema_dimensions.keys())
+        selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
 
-if st.button("Discover Gourmet Matches"):
-           
+        if st.button("Discover Gourmet Matches"):
+            
             df_pool = fetch_recommendation_pool(target_movie['id'])
             
             if not df_pool.empty:
@@ -125,101 +126,104 @@ if st.button("Discover Gourmet Matches"):
                 similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
                 
                 idx = 0 
-        dimension_words = cinema_dimensions[selected_dimension]
-        
-        selected_row = df.iloc[idx]
-        selected_title_lower = selected_movie.lower()
-        selected_overview_clean = selected_row['overview'].strip().lower()
-        
-        selected_title_words = set([w for w in selected_title_lower.split() if len(w) > 2])
-        
-        selected_cast = str(selected_row.get('cast', '')).lower()
-        selected_crew = str(selected_row.get('crew', '')).lower()
-        
-        selected_cast_words = set(re.findall(r'"name":\s*"([^"]+)"', selected_cast)[:3])
-        selected_cast_words = {w.lower() for name in selected_cast_words for w in name.split()}
-        
-        selected_director = ""
-        director_match = re.search(r'"job":\s*"Director",\s*"name":\s*"([^"]+)"', selected_crew)
-        if director_match:
-            selected_director = director_match.group(1).lower()
+                
+                
+                dimension_words = cinema_dimensions[selected_dimension]
+                
+                selected_row = df.iloc[idx]
+                selected_title_lower = selected_movie.lower()
+                selected_overview_clean = selected_row['overview'].strip().lower()
+                
+                selected_title_words = set([w for w in selected_title_lower.split() if len(w) > 2])
+                
+                selected_cast = str(selected_row.get('cast', '')).lower()
+                selected_crew = str(selected_row.get('crew', '')).lower()
+                
+                selected_cast_words = set(re.findall(r'"name":\s*"([^"]+)"', selected_cast)[:3])
+                selected_cast_words = {w.lower() for name in selected_cast_words for w in name.split()}
+                
+                selected_director = ""
+                director_match = re.search(r'"job":\s*"Director",\s*"name":\s*"([^"]+)"', selected_crew)
+                if director_match:
+                    selected_director = director_match.group(1).lower()
 
-       
-        scores = list(enumerate(similarity_matrix[idx]))
-        
-        scores = sorted(scores, key=lambda x: x[1], reverse=True)
-        top_150_candidates = scores[1:151]
-        
-        valid_indices = []
-        tfidf_scores_map = {}
-        seen_overviews = set()
-        
-        if selected_overview_clean:
-            seen_overviews.add(selected_overview_clean)
-            
-        for i, score in top_150_candidates:
-            candidate_row = df.iloc[i]
-            candidate_title = candidate_row['title'].lower()
-            candidate_overview = candidate_row['overview'].strip().lower()
-            
-          
-            if candidate_overview in seen_overviews or any(candidate_overview[:30] == seen[:30] for seen in seen_overviews):
-                continue
+               
+                scores = list(enumerate(similarity_matrix[idx]))
                 
-        
-            candidate_title_words = set([w for w in candidate_title.split() if len(w) > 2])
-            is_same_name = bool(selected_title_words.intersection(candidate_title_words))
-            
-            candidate_cast = str(candidate_row.get('cast', '')).lower()
-            candidate_crew = str(candidate_row.get('crew', '')).lower()
-            
-            candidate_director = ""
-            c_dir_match = re.search(r'"job":\s*"Director",\s*"name":\s*"([^"]+)"', candidate_crew)
-            if c_dir_match:
-                candidate_director = c_dir_match.group(1).lower()
+                scores = sorted(scores, key=lambda x: x[1], reverse=True)
+                top_150_candidates = scores[1:151]
                 
-            candidate_cast_names = set(re.findall(r'"name":\s*"([^"]+)"', candidate_cast)[:3])
-            candidate_cast_words = {w.lower() for name in candidate_cast_names for w in name.split()}
-            
-            is_same_director = (selected_director == candidate_director) if selected_director else False
-            is_same_actors = bool(selected_cast_words.intersection(candidate_cast_words)) if selected_cast_words else False
-            
-            if is_same_name or (is_same_director and is_same_actors):
-                continue
+                valid_indices = []
+                tfidf_scores_map = {}
+                seen_overviews = set()
                 
-            valid_indices.append(i)
-            tfidf_scores_map[i] = score
-            if candidate_overview:
-                seen_overviews.add(candidate_overview)
+                if selected_overview_clean:
+                    seen_overviews.add(selected_overview_clean)
+                    
+                for i, score in top_150_candidates:
+                    candidate_row = df.iloc[i]
+                    candidate_title = candidate_row['title'].lower()
+                    candidate_overview = candidate_row['overview'].strip().lower()
+                    
+                  
+                    if candidate_overview in seen_overviews or any(candidate_overview[:30] == seen[:30] for seen in seen_overviews):
+                        continue
+                        
                 
-            if len(valid_indices) >= 40:
-                break
+                    candidate_title_words = set([w for w in candidate_title.split() if len(w) > 2])
+                    is_same_name = bool(selected_title_words.intersection(candidate_title_words))
+                    
+                    candidate_cast = str(candidate_row.get('cast', '')).lower()
+                    candidate_crew = str(candidate_row.get('crew', '')).lower()
+                    
+                    candidate_director = ""
+                    c_dir_match = re.search(r'"job":\s*"Director",\s*"name":\s*"([^"]+)"', candidate_crew)
+                    if c_dir_match:
+                        candidate_director = c_dir_match.group(1).lower()
+                        
+                    candidate_cast_names = set(re.findall(r'"name":\s*"([^"]+)"', candidate_cast)[:3])
+                    candidate_cast_words = {w.lower() for name in candidate_cast_names for w in name.split()}
+                    
+                    is_same_director = (selected_director == candidate_director) if selected_director else False
+                    is_same_actors = bool(selected_cast_words.intersection(candidate_cast_words)) if selected_cast_words else False
+                    
+                    if is_same_name or (is_same_director and is_same_actors):
+                        continue
+                        
+                    valid_indices.append(i)
+                    tfidf_scores_map[i] = score
+                    if candidate_overview:
+                        seen_overviews.add(candidate_overview)
+                        
+                    if len(valid_indices) >= 40:
+                        break
+                        
+             
+                candidate_movies = df.iloc[valid_indices].copy().reset_index(drop=True)
                 
-     
-        candidate_movies = df.iloc[valid_indices].copy().reset_index(drop=True)
-        
-        def calculate_dimension_score(info_soup):
-            score = 0
-            for word in dimension_words:
-                score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', info_soup))
-            return score
-            
-        candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
-        
-       
-        candidate_movies['tfidf_score'] = candidate_movies['title'].map({df.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
-      
-        def apply_imdb_penalty(row):
-            if row['vote_average'] < 6.0:
-                return float(row['dimension_score']) * 0.5
-            return float(row['dimension_score'])
+                def calculate_dimension_score(info_soup):
+                    score = 0
+                    for word in dimension_words:
+                        score += len(re.findall(r'\b' + re.escape(word.lower()) + r'\b', info_soup))
+                    return score
+                    
+                candidate_movies['dimension_score'] = candidate_movies['info_soup'].apply(calculate_dimension_score)
+                
+               
+                candidate_movies['tfidf_score'] = candidate_movies['title'].map({df.loc[k, 'title']: s for k, s in tfidf_scores_map.items()})
+              
+                def apply_imdb_penalty(row):
+                    if row['vote_average'] < 6.0:
+                        return float(row['dimension_score']) * 0.5
+                    return float(row['dimension_score'])
 
-        candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
-        
-        # Calculate the Score
-        candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
+                candidate_movies['final_dimension_score'] = candidate_movies.apply(apply_imdb_penalty, axis=1)
+                
+                # Calculate the Score
+                candidate_movies['quality_score'] = (candidate_movies['tfidf_score'] * 0.4) + ((candidate_movies['vote_average'] / 10.0) * 0.6)
 
-        results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
+                results = candidate_movies.sort_values(by=['final_dimension_score', 'quality_score'], ascending=[False, False]).head(5)
+
 
         
         # ==========================================
