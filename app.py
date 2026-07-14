@@ -30,42 +30,45 @@ def get_poster_url(movie_id):
 
 
 
+
 # ==========================================
-# 1. DATA AND AI
+# 1. LIVE DATA RECRUITMENT POOL
 # ==========================================
-
-@st.cache_data  
-def prepare_data():
-    movies = pd.read_csv('movies.csv')
-    credits = pd.read_csv('credits.csv')
-    credits.columns = ['movie_id', 'title', 'cast', 'crew']
+def fetch_recommendation_pool(movie_id):
+    """
+    Fetches similar, top-rated, and popular movies from TMDB API 
+    real-time to dynamically train our AI model.
+    """
+    api_key = st.secrets["TMDB_API_KEY"]
+    pool = []
+    seen_ids = set()
     
-    df = movies.merge(credits, on='title').drop_duplicates(subset=['title']).reset_index(drop=True)
+    # Gathering movie candidates from 4 different API streams
+    urls = [
+        f"https://themoviedb.org{movie_id}/similar?api_key={api_key}&language=en-US&page=1",
+        f"https://themoviedb.org{movie_id}/recommendations?api_key={api_key}&language=en-US&page=1",
+        f"https://themoviedb.orgtop_rated?api_key={api_key}&language=en-US&page=1",
+        f"https://themoviedb.orgpopular?api_key={api_key}&language=en-US&page=1"
+    ]
     
-    def clean_text(text):
-        if pd.isna(text): 
-            return ""
-        found = re.findall(r'"name":\s*"([^"]+)"', str(text))
-        return " ".join([i.lower().replace(" ", "") for i in found])
-        
-    df['clean_genres'] = df['genres'].apply(clean_text)
-    df['clean_keywords'] = df['keywords'].apply(clean_text)
-    df['overview'] = df['overview'].fillna('')
-    
-    df['info_soup'] = df['clean_genres'] + " " + df['clean_keywords'] + " " + df['overview'].str.lower()
-    
-    if 'vote_average' in df.columns:
-        df['vote_average'] = df['vote_average'].fillna(0.0)
-    else:
-        df['vote_average'] = 0.0
+    for url in urls:
+        try:
+            results = requests.get(url, timeout=3).json().get('results', [])
+            for m in results:
+                if m['id'] not in seen_ids and m.get('overview'):
+                    seen_ids.add(m['id'])
+                    pool.append({
+                        'movie_id': m['id'],
+                        'title': m['title'],
+                        'overview': m['overview'],
+                        'vote_average': m.get('vote_average', 0.0),
+                        'poster_path': m.get('poster_path', '')
+                    })
+        except:
+            continue
+            
+    return pd.DataFrame(pool)
 
-    return df
-
-df = prepare_data()
-
-tfidf_vectorizer = TfidfVectorizer(stop_words='english')
-tfidf_matrix = tfidf_vectorizer.fit_transform(df['info_soup'])
-similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
 
 movie_indices = pd.Series(df.index, index=df['title'])
 
@@ -85,14 +88,44 @@ st.set_page_config(page_title="Gourmet Movie Recommender System", page_icon="�
 st.title("AI-Powered Cinema Assistant")
 st.write("Select a movie you have watched and choose the aspect that impressed you the most. Let AI provide you with pinpoint gourmet recommendations!")
 
-movie_list = sorted(df['title'].tolist())
-selected_movie = st.selectbox("Select a movie you watched and liked:", movie_list)
+search_query = st.text_input("Select a movie you watched and liked (e.g., The Love Witch, Saw):", "")
+
+if search_query:
+    api_key = st.secrets["TMDB_API_KEY"]
+    search_url = f"https://themoviedb.org{api_key}&query={search_query}&language=en-US"
+    search_results = requests.get(search_url).json().get('results', [])
+    
+    if search_results:
+        movie_options = {f"{m['title']} ({m.get('release_date', '')[:4]})": m for m in search_results}
+        selected_display = st.selectbox("Which movie do you mean exactly?", list(movie_options.keys()))
+        target_movie = movie_options[selected_display]
+
 dimensions = list(cinema_dimensions.keys())
 selected_dimension = st.radio("Which aspect of this movie captivated you the most?", dimensions)
 
-if st.button("Discover Gourmet Matches"):
-    if selected_movie in movie_indices:
-        idx = movie_indices[selected_movie]
+        if st.button("Discover Gourmet Matches"):
+            # Canlı veri havuzumuzu internetten çekip AI modelimizi anlık eğitiyoruz
+            df_pool = fetch_recommendation_pool(target_movie['id'])
+            
+            if not df_pool.empty:
+                # Orijinal filmi modelin en başına ekliyoruz
+                orig_row = pd.DataFrame([{
+                    'movie_id': target_movie['id'],
+                    'title': target_movie['title'],
+                    'overview': target_movie['overview'],
+                    'vote_average': target_movie.get('vote_average', 0.0),
+                    'poster_path': target_movie.get('poster_path', ''),
+                    'clean_genres': ""
+                }])
+                df = pd.concat([orig_row, df_pool]).drop_duplicates(subset=['movie_id']).reset_index(drop=True)
+                
+                # --- REAL-TIME AI PIPELINE (TF-IDF & COSINE SIMILARITY) ---
+                tfidf_vectorizer = TfidfVectorizer(stop_words='english')
+                tfidf_matrix = tfidf_vectorizer.fit_transform(df['overview'].str.lower())
+                similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+                
+                idx = 0 # Orijinal filmimiz artık her zaman havuzun en başında yani 0. indekste
+
         dimension_words = cinema_dimensions[selected_dimension]
         
         selected_row = df.iloc[idx]
@@ -194,7 +227,8 @@ if st.button("Discover Gourmet Matches"):
         # 3. DISPLAY RESULTS
         # ==========================================
         with st.container():
-            st.success(f"🍿 '{selected_movie}' AI results for those who love [{selected_dimension}] and focus on:")
+            st.success(f"'{target_movie['title']}' AI results for those who love [{selected_dimension}]:")
+
             
             for i, (_, row) in enumerate(results.iterrows(), 1):
                 genres_list = ", ".join(row['clean_genres'].split()).title() if row['clean_genres'] else "Not Specified"
@@ -233,4 +267,7 @@ if st.button("Discover Gourmet Matches"):
                             st.write(movie_overview)
     
                 st.divider()
+                    else:
+        st.warning("No movie found with that name, please try again.")
+
                     
