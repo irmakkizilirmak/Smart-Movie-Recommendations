@@ -270,7 +270,7 @@ if search_query:
                             st.write(movie_overview)
     
                 st.divider()
-                    else:
+    else:
         st.warning("No movie found with that name, please try again.")
 
                     
