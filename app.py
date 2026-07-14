@@ -157,7 +157,7 @@ if st.button("Discover Gourmet Matches") and selected_movie_data:
         
             results = sorted(scored_candidates, key=lambda x: (x["final_dim_score"], x["quality_score"]), reverse=True)[:5]
             
-            st.success(f"🍿 [{selected_dimension}] odaklı '{target_title}' benzeri gurme seçimlerimiz:")
+            st.success(f"Our gourmet selections similar to '{target_title}' for those who appreciate [{selected_dimension}]:")
             st.divider()
             
             for i, movie in enumerate(results, 1):
